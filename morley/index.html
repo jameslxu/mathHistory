@@ -17,7 +17,7 @@
 </head>
 <body>
     <h2>Morley's Theorem Visualization</h2>
-    <p>Drag the vertices to explore Morley's Theorem</p>
+    <p>Drag the vertices to see Morley's equilateral triangle</p>
     <canvas id="canvas" width="600" height="600"></canvas>
 
     <script>
@@ -25,9 +25,9 @@
         const ctx = canvas.getContext("2d");
 
         let points = [
-            { x: 200, y: 100, dragging: false },
-            { x: 100, y: 400, dragging: false },
-            { x: 400, y: 300, dragging: false }
+            { x: 200, y: 150, dragging: false },
+            { x: 100, y: 450, dragging: false },
+            { x: 400, y: 350, dragging: false }
         ];
 
         function draw() {
