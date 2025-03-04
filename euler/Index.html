@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Draggable Triangle with Toggleable Center Lines</title>
+    <style>
+      /* Simple CSS to remove margins and center the canvas */
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Include p5.js from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+    <script>
+      // Global variables for the triangle, dragging, and toggle flags.
+      let triangleVerts = [];
+      let selectedVertex = -1; // index of vertex being dragged (-1 means none)
+      const dragThreshold = 10; // pixels for selecting a vertex
+      const centerClickThreshold = 10; // pixels for clicking on a center
+
+      // Toggle flags for each set of lines
+      let showMedians = true;         // medians (for centroid)
+      let showBisectors = true;       // perpendicular bisectors (for circumcenter)
+      let showAltitudes = true;       // altitudes (for orthocenter)
+      const extension = 2000;         // extension length for drawing lines
+
+      function setup() {
+        createCanvas(800, 600);
+        // Initialize triangle vertices (as p5.Vector objects)
+        triangleVerts = [
+          createVector(200, 150),
+          createVector(600, 150),
+          createVector(400, 450)
+        ];
+      }
+
+      function draw() {
+        background(0);
+
+        strokeWeight(2);
+        // Draw the triangle edges in white.
+        stroke(255);
+        noFill();
+        triangle(
+          triangleVerts[0].x, triangleVerts[0].y,
+          triangleVerts[1].x, triangleVerts[1].y,
+          triangleVerts[2].x, triangleVerts[2].y
+        );
+
+        // Draw the vertices as magenta circles.
+        fill(255, 0, 255);
+        noStroke();
+        for (let v of triangleVerts) {
+          ellipse(v.x, v.y, 20, 20);
+        }
+
+        // Compute the centers.
+        const centroid = computeCentroid(triangleVerts);
+        const circumcenter = computeCircumcenter(triangleVerts[0], triangleVerts[1], triangleVerts[2]);
+        let orthocenter = null;
+        if (circumcenter) {
+          // Use the Euler relation: H = 3G - 2O.
+          orthocenter = p5.Vector.mult(centroid, 3);
+          orthocenter.sub(p5.Vector.mult(circumcenter, 2));
+        }
+
+        // Draw center points.
+        // Centroid (green)
+        fill(0, 255, 0);
+        ellipse(centroid.x, centroid.y, 12, 12);
+        // Circumcenter (red)
+        if (circumcenter) {
+          fill(255, 0, 0);
+          ellipse(circumcenter.x, circumcenter.y, 12, 12);
+        }
+        // Orthocenter (blue)
+        if (orthocenter) {
+          fill(0, 0, 255);
+          ellipse(orthocenter.x, orthocenter.y, 12, 12);
+        }
+
+        // Draw associated lines if toggles are enabled.
+        // 1. Medians (concurrent at the centroid) – drawn in green.
+        if (showMedians) {
+          stroke(0, 255, 0);
+          strokeWeight(1);
+          for (let i = 0; i < 3; i++) {
+            let vertex = triangleVerts[i];
+            // Opposite side endpoints.
+            let v1 = triangleVerts[(i + 1) % 3];
+            let v2 = triangleVerts[(i + 2) % 3];
+            let mid = p5.Vector.add(v1, v2).mult(0.5);
+            line(vertex.x, vertex.y, mid.x, mid.y);
+          }
+        }
+
+        // 2. Perpendicular bisectors (concurrent at the circumcenter) – drawn in red.
+        if (showBisectors) {
+          stroke(255, 0, 0);
+          strokeWeight(1);
+          for (let i = 0; i < 3; i++) {
+            let a = triangleVerts[i];
+            let b = triangleVerts[(i + 1) % 3];
+            let mid = p5.Vector.add(a, b).mult(0.5);
+            // Edge vector and its perpendicular.
+            let edge = p5.Vector.sub(b, a);
+            let perp = createVector(-edge.y, edge.x);
+            if (perp.mag() !== 0) {
+              perp.normalize();
+              let startPoint = p5.Vector.sub(mid, p5.Vector.mult(perp, extension));
+              let endPoint = p5.Vector.add(mid, p5.Vector.mult(perp, extension));
+              line(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+            }
+          }
+        }
+
+        // 3. Altitudes (concurrent at the orthocenter) – drawn in blue.
+        if (showAltitudes) {
+          stroke(0, 0, 255);
+          strokeWeight(1);
+          for (let i = 0; i < 3; i++) {
+            let vertex = triangleVerts[i];
+            let opp1 = triangleVerts[(i + 1) % 3];
+            let opp2 = triangleVerts[(i + 2) % 3];
+            // Opposite side defined by opp1 and opp2.
+            let side = p5.Vector.sub(opp2, opp1);
+            // Altitude direction: perpendicular to the side.
+            let altitudeDir = createVector(-side.y, side.x);
+            if (altitudeDir.mag() !== 0) {
+              altitudeDir.normalize();
+              let startPoint = p5.Vector.sub(vertex, p5.Vector.mult(altitudeDir, extension));
+              let endPoint = p5.Vector.add(vertex, p5.Vector.mult(altitudeDir, extension));
+              line(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+            }
+          }
+        }
+      }
+
+      // --- Utility Functions ---
+
+      // Compute the centroid as the average of the triangle vertices.
+      function computeCentroid(verts) {
+        let sum = createVector(0, 0);
+        for (let v of verts) {
+          sum.add(v);
+        }
+        return p5.Vector.div(sum, verts.length);
+      }
+
+      // Compute the circumcenter given three vertices A, B, and C.
+      // Returns a p5.Vector or null if the triangle is degenerate.
+      function computeCircumcenter(A, B, C) {
+        // D = 2*(Ax(By - Cy) + Bx(Cy - Ay) + Cx(Ay - By))
+        let D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+        if (abs(D) < 1e-6) return null;
+        let A2 = A.x * A.x + A.y * A.y;
+        let B2 = B.x * B.x + B.y * B.y;
+        let C2 = C.x * C.x + C.y * C.y;
+        let Ux = (A2 * (B.y - C.y) + B2 * (C.y - A.y) + C2 * (A.y - B.y)) / D;
+        let Uy = (A2 * (C.x - B.x) + B2 * (A.x - C.x) + C2 * (B.x - A.x)) / D;
+        return createVector(Ux, Uy);
+      }
+
+      // --- Mouse and Touch Interaction ---
+
+      // When the mouse is pressed, first check for center clicks (to toggle associated lines);
+      // if none are detected, check if a vertex was clicked (for dragging).
+      function mousePressed() {
+        const centroid = computeCentroid(triangleVerts);
+        const circumcenter = computeCircumcenter(triangleVerts[0], triangleVerts[1], triangleVerts[2]);
+        let orthocenter = null;
+        if (circumcenter) {
+          orthocenter = p5.Vector.mult(centroid, 3);
+          orthocenter.sub(p5.Vector.mult(circumcenter, 2));
+        }
+
+        // Toggle medians if clicking near the centroid.
+        if (dist(mouseX, mouseY, centroid.x, centroid.y) < centerClickThreshold) {
+          showMedians = !showMedians;
+          return;
+        }
+        // Toggle perpendicular bisectors if clicking near the circumcenter.
+        if (circumcenter && dist(mouseX, mouseY, circumcenter.x, circumcenter.y) < centerClickThreshold) {
+          showBisectors = !showBisectors;
+          return;
+        }
+        // Toggle altitudes if clicking near the orthocenter.
+        if (orthocenter && dist(mouseX, mouseY, orthocenter.x, orthocenter.y) < centerClickThreshold) {
+          showAltitudes = !showAltitudes;
+          return;
+        }
+
+        // Otherwise, check if a vertex is clicked (for dragging).
+        for (let i = 0; i < triangleVerts.length; i++) {
+          if (dist(mouseX, mouseY, triangleVerts[i].x, triangleVerts[i].y) < dragThreshold) {
+            selectedVertex = i;
+            break;
+          }
+        }
+      }
+
+      // Drag the selected vertex with the mouse.
+      function mouseDragged() {
+        if (selectedVertex !== -1) {
+          triangleVerts[selectedVertex] = createVector(mouseX, mouseY);
+        }
+      }
+
+      function mouseReleased() {
+        selectedVertex = -1;
+      }
+
+      // --- Touch Event Handlers ---
+      // These call the mouse event functions to enable touch support.
+
+      function touchStarted() {
+        mousePressed();
+        return false; // Prevent default behavior
+      }
+
+      function touchMoved() {
+        mouseDragged();
+        return false;
+      }
+
+      function touchEnded() {
+        mouseReleased();
+        return false;
+      }
+    </script>
+  </body>
+</html>
