@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morley's Theorem Visualization</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 1px solid black;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Morley's Theorem Visualization</h2>
+    <p>Drag the vertices to explore Morley's Theorem</p>
+    <canvas id="canvas" width="600" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        let points = [
+            { x: 200, y: 100, dragging: false },
+            { x: 100, y: 400, dragging: false },
+            { x: 400, y: 300, dragging: false }
+        ];
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw main triangle
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            ctx.lineTo(points[1].x, points[1].y);
+            ctx.lineTo(points[2].x, points[2].y);
+            ctx.closePath();
+            ctx.stroke();
+
+            // Compute trisectors and Morley triangle
+            let trisectors = [];
+            for (let i = 0; i < 3; i++) {
+                let a = points[i];
+                let b = points[(i + 1) % 3];
+                let c = points[(i + 2) % 3];
+
+                let trisector1 = trisectAngle(a, b, c, 1);
+                let trisector2 = trisectAngle(a, b, c, 2);
+
+                trisectors.push(trisector1);
+                trisectors.push(trisector2);
+
+                ctx.strokeStyle = "blue";
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(trisector1.x, trisector1.y);
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(trisector2.x, trisector2.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Find Morley's equilateral triangle
+            let morleyPoints = [
+                intersection(trisectors[1], trisectors[2]),
+                intersection(trisectors[3], trisectors[4]),
+                intersection(trisectors[5], trisectors[0])
+            ];
+
+            // Draw Morley's triangle
+            ctx.strokeStyle = "red";
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(morleyPoints[0].x, morleyPoints[0].y);
+            ctx.lineTo(morleyPoints[1].x, morleyPoints[1].y);
+            ctx.lineTo(morleyPoints[2].x, morleyPoints[2].y);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw draggable points
+            ctx.fillStyle = "black";
+            for (let p of points) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function trisectAngle(a, b, c, index) {
+            let angleAB = Math.atan2(b.y - a.y, b.x - a.x);
+            let angleAC = Math.atan2(c.y - a.y, c.x - a.x);
+            let trisectAngle = angleAB + (angleAC - angleAB) * (index / 3);
+            return {
+                x: a.x + 80 * Math.cos(trisectAngle),
+                y: a.y + 80 * Math.sin(trisectAngle)
+            };
+        }
+
+        function intersection(p1, p2) {
+            return {
+                x: (p1.x + p2.x) / 2,
+                y: (p1.y + p2.y) / 2
+            };
+        }
+
+        function onMouseDown(event) {
+            const { offsetX, offsetY } = event;
+            for (let p of points) {
+                if (Math.hypot(p.x - offsetX, p.y - offsetY) < 10) {
+                    p.dragging = true;
+                    break;
+                }
+            }
+        }
+
+        function onMouseMove(event) {
+            const { offsetX, offsetY } = event;
+            for (let p of points) {
+                if (p.dragging) {
+                    p.x = offsetX;
+                    p.y = offsetY;
+                    draw();
+                }
+            }
+        }
+
+        function onMouseUp() {
+            for (let p of points) p.dragging = false;
+        }
+
+        canvas.addEventListener("mousedown", onMouseDown);
+        canvas.addEventListener("mousemove", onMouseMove);
+        canvas.addEventListener("mouseup", onMouseUp);
+        canvas.addEventListener("mouseleave", onMouseUp);
+
+        draw();
+    </script>
+</body>
+</html>
